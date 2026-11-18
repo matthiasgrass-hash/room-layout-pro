@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Grundriss">
+<meta name="theme-color" content="#f3f4f1">
 <style>*,*::before,*::after{box-sizing:border-box}body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <title>Grundriss-Skizze</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -115,6 +116,10 @@ button,select,input{font:inherit;color:var(--ink)}
 .actions .btn{border-color:var(--line);background:var(--sheet);flex:1}
 .actions .btn.del{color:var(--danger)}
 .walllist{display:flex;flex-direction:column;gap:6px}
+.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:6px}
+.sw{aspect-ratio:1;max-width:100%;min-height:36px;border-radius:50%;border:1px solid var(--line);cursor:pointer;padding:0;
+  background:repeating-linear-gradient(45deg,var(--sheet) 0 5px,var(--line) 5px 6px)}
+.sw.on{box-shadow:0 0 0 2px var(--chrome),0 0 0 4px var(--accent)}
 
 .hint{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:2;display:flex;align-items:flex-start;gap:4px;
   background:var(--chrome);border:1px solid var(--line);border-radius:16px;padding:10px 6px 10px 16px;color:var(--muted);font-size:13px;width:min(540px,calc(100% - 260px));line-height:1.5;
@@ -156,6 +161,7 @@ button,select,input{font:inherit;color:var(--ink)}
     </div>
     <div class="spacer"></div>
     <div class="pill">
+      <button class="btn icon" id="themeBtn" title="Hell / Dunkel" aria-label="Hell oder dunkel umschalten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></svg></button>
       <button class="btn icon" id="settingsBtn" title="Einstellungen" aria-label="Einstellungen" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
       <button class="btn primary" id="export" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Exportieren</button>
     </div>
@@ -194,6 +200,7 @@ button,select,input{font:inherit;color:var(--ink)}
   <div class="settings" id="settings" hidden>
     <div class="row"><label for="wallT">Wandstärke neu</label><div class="unit" data-u="cm"><input id="wallT" type="text" inputmode="decimal" value="12"></div></div>
     <div class="row"><label for="measure">Maße anzeigen als</label><select id="measure"><option value="inner">Innenmaß</option><option value="axis">Achsmaß</option></select></div>
+    <div class="row"><label for="themeSel">Darstellung</label><select id="themeSel"><option value="system">Wie System</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></div>
     <div class="row"><label for="fingerMode">Finger auf dem Display</label><select id="fingerMode"><option value="auto">Automatisch</option><option value="draw">Zeichnet</option><option value="pan">Verschiebt nur</option></select></div>
     <div class="note">Automatisch: Der Finger zeichnet, bis ein Apple Pencil benutzt wird. Danach zeichnet nur der Stift und der Finger verschiebt. Mit zwei Fingern verschieben und zoomen geht immer.</div>
     <button class="btn menu danger" id="clear"><b>Neuer Plan</b><span>Alles löschen und leer beginnen</span></button>
@@ -387,6 +394,11 @@ let pal={};
 function readPal(){ const cs=getComputedStyle(document.documentElement); const g=k=>cs.getPropertyValue(k).trim();
   pal={paper:g('--paper'),ink:g('--ink'),muted:g('--muted'),accent:g('--accent'),soft:g('--accent-soft'),furn:g('--furn'),furnLine:g('--furn-line'),
     room:g('--room'),grid:g('--grid'),gridMajor:g('--grid-major'),sheet:g('--sheet')}; }
+const FILLS=[[null,'Standard'],['#e3c9a0','Eiche'],['#b98c63','Nussbaum'],['#cfd2d6','Grau'],['#bdb8ae','Beton'],['#a9c6ea','Blau'],
+  ['#b5d8ad','Grün'],['#f0c2c7','Rosa'],['#f2dd9a','Gelb'],['#de9f82','Terrakotta']];
+const PATTERNS=[['','Keine'],['parkett','Parkett'],['fliesen','Fliesen'],['dielen','Dielen']];
+function hexA(h,a){ const n=parseInt(h.slice(1),16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+function isDark(){ const t=document.documentElement.dataset.theme; return t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches); }
 const LIGHT={paper:'#ffffff',ink:'#22262b',muted:'#6a7078',accent:'#2a56c6',soft:'rgba(42,86,198,.12)',furn:'#ffffff',furnLine:'#59616b',room:'rgba(42,86,198,.04)',grid:'rgba(0,0,0,0)',gridMajor:'rgba(0,0,0,0)',sheet:'#fff'};
 
 /* ---------- Zeichnen ---------- */
@@ -403,7 +415,7 @@ function handlePos(it,px){ const b=itemBox(it); const ys=[b.y0*it.fy,b.y1*it.fy]
 function drawItem(c,it,P,px,isSel){
   const k=CAT[it.type]?.k||'table', w=it.w, d=it.d, wt=it.wt||24;
   c.save(); c.translate(it.x,it.y); c.rotate(it.rot*deg); c.scale(it.fx,it.fy);
-  c.lineWidth=1.25*px; c.strokeStyle=isSel?P.accent:P.furnLine; c.fillStyle=P.furn; c.lineJoin='round';
+  c.lineWidth=1.25*px; c.strokeStyle=isSel?P.accent:P.furnLine; c.fillStyle=it.color?(isDark()&&!c.__export&&!c.__thumb?hexA(it.color,.55):it.color):P.furn; c.lineJoin='round';
   const R=(x,y,ww,hh,r=0,fill=true)=>{rr(c,x,y,ww,hh,r); if(fill)c.fill(); c.stroke();};
   const E=(x,y,rx,ry,fill=true)=>{c.beginPath(); c.ellipse(x,y,Math.abs(rx),Math.abs(ry),0,0,Math.PI*2); if(fill)c.fill(); c.stroke();};
   const Ln=(x1,y1,x2,y2)=>{c.beginPath();c.moveTo(x1,y1);c.lineTo(x2,y2);c.stroke();};
@@ -466,7 +478,14 @@ function renderPlan(c,P,s,opts={}){
   const px=1/s;
   // Räume
   state.rooms.forEach(r=>{ const Pp=roomPoly(r); if(Pp.length<3)return; c.beginPath(); Pp.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y)); c.closePath();
-    c.fillStyle=P.room; c.fill(); if(!opts.export&&selection?.type==='room'&&selection.id===r.id){c.fillStyle=P.soft;c.fill();} });
+    c.fillStyle=r.color?hexA(r.color,opts.export||!isDark()?.6:.42):P.room; c.fill();
+    if(r.pattern){ c.save(); c.clip(); const xs=Pp.map(p=>p.x),ys=Pp.map(p=>p.y),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+      c.strokeStyle=opts.export||!isDark()?'rgba(40,40,40,.22)':'rgba(255,255,255,.16)'; c.lineWidth=Math.max(.6,1/s); c.beginPath();
+      if(r.pattern==='fliesen'){ for(let x=x0;x<=x1;x+=30){c.moveTo(x,y0);c.lineTo(x,y1);} for(let y=y0;y<=y1;y+=30){c.moveTo(x0,y);c.lineTo(x1,y);} }
+      else if(r.pattern==='dielen'){ for(let y=y0;y<=y1;y+=20){c.moveTo(x0,y);c.lineTo(x1,y);} let row=0; for(let y=y0;y<y1;y+=20,row++){ for(let x=x0+(row%3)*70;x<=x1;x+=210){c.moveTo(x,y);c.lineTo(x,y+20);} } }
+      else { for(let d=x0-(y1-y0);d<=x1+(y1-y0);d+=18){c.moveTo(d,y0);c.lineTo(d+(y1-y0),y1);} }
+      c.stroke(); c.restore(); }
+    if(!opts.export&&selection?.type==='room'&&selection.id===r.id){c.fillStyle=P.soft;c.fill();} });
   // Möbel (keine Öffnungen)
   state.items.filter(i=>!OPENING[CAT[i.type]?.k]).forEach(i=>drawItem(c,i,P,px,!opts.export&&selection?.type==='item'&&selection.id===i.id));
   // Wände
@@ -643,6 +662,8 @@ function snapOpening(it){ const px=1/view.s; let best=null,bd=40*px;
   it.x=a.x+(b.x-a.x)*p.t; it.y=a.y+(b.y-a.y)*p.t; let ang=Math.atan2(b.y-a.y,b.x-a.x)/deg;
   if(Math.abs(angDiff(ang*deg,it.rot*deg))>Math.PI/2)ang+=180; it.rot=((Math.round(ang)%360)+360)%360; it.wt=best.t; return true; }
 
+function openingsOn(w){ const a=node(w.a),b=node(w.b); return state.items.filter(it=>OPENING[CAT[it.type]?.k]&&distSeg(it,a,b)<=w.t/2+3); }
+
 /* ---------- Eingabe ---------- */
 const pointers=new Map(); let gesture=null, penDown=false, spaceDown=false;
 function sp(e){const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top};}
@@ -658,7 +679,7 @@ cv.addEventListener('pointerdown',e=>{
     const touches=[...pointers.values()].filter(q=>q.type==='touch').length;
     if(touches>=2){ startPinch(); draw(); return; }
     if(!fingerDraws()){ const w=toW(p.x,p.y), hit=hitTest(w);
-      if(hit&&(hit.type==='handle'||hit.type==='item'&&selection?.type==='item'&&selection.id===hit.obj.id||hit.type==='room'&&selection?.type==='room'&&selection.id===hit.obj.id)){ primaryDown(p,true); return; }
+      if(hit&&(hit.type==='handle'||hit.type==='wall'&&selection?.type==='wall'&&selection.id===hit.obj.id||hit.type==='item'&&selection?.type==='item'&&selection.id===hit.obj.id||hit.type==='room'&&selection?.type==='room'&&selection.id===hit.obj.id)){ primaryDown(p,true); return; }
       gesture={kind:'pan',last:p,start:p,moved:false,tapPossible:true}; return; }
   }
   if(type==='mouse'&&(e.button===1||e.button===2||spaceDown)){ gesture={kind:'pan',last:p,start:p,moved:false}; return; }
@@ -671,6 +692,8 @@ function primaryDown(p,byTouch){
   if(hit?.type==='item'){ select(hit); gesture={kind:'item',it:hit.obj,off:{x:w.x-hit.obj.x,y:w.y-hit.obj.y},start:p,started:false,byTouch}; return; }
   if(hit?.type==='room'&&(settings.tool==='edit'||(selection?.type==='room'&&selection.id===hit.obj.id))){
     select(hit); gesture={kind:'room',r:hit.obj,last:w,start:p,started:false,byTouch}; return; }
+  if(hit?.type==='wall'&&selection?.type==='wall'&&selection.id===hit.obj.id){
+    gesture={kind:'wall',w:hit.obj,last:w,start:p,started:false,moved:0,byTouch}; return; }
   if(settings.tool==='edit'){
     if(hit?.type==='node'){gesture={kind:'node',n:hit.obj,start:p,started:false,byTouch}; return;}
     if(hit?.type==='wall'){select(hit); gesture={kind:'wall',w:hit.obj,last:w,start:p,started:false,byTouch}; return;}
@@ -703,10 +726,11 @@ cv.addEventListener('pointermove',e=>{
     case 'room':{ if(!gesture.started){ if(dist(p,gesture.start)<4)return; checkpoint(); gesture.started=true; }
       const w=toW(p.x,p.y); const dx=Math.round(w.x-gesture.last.x), dy=Math.round(w.y-gesture.last.y); if(!dx&&!dy)return;
       moveRoom(gesture.r,dx,dy); gesture.last={x:gesture.last.x+dx,y:gesture.last.y+dy}; draw(); break;}
-    case 'wall':{ if(!gesture.started){ if(dist(p,gesture.start)<4)return; checkpoint(); gesture.started=true; }
+    case 'wall':{ if(!gesture.started){ if(dist(p,gesture.start)<4)return; checkpoint(); gesture.started=true; gesture.ops=openingsOn(gesture.w); }
       const w=toW(p.x,p.y); const dx=w.x-gesture.last.x, dy=w.y-gesture.last.y; const a=node(gesture.w.a),b=node(gesture.w.b);
       // nur senkrecht zur Wand verschieben
-      const L=dist(a,b)||1, nx=-(b.y-a.y)/L, ny=(b.x-a.x)/L, k=dx*nx+dy*ny; a.x+=nx*k;a.y+=ny*k;b.x+=nx*k;b.y+=ny*k; gesture.last=w; draw(); break;}
+      const L=dist(a,b)||1, nx=-(b.y-a.y)/L, ny=(b.x-a.x)/L, k=dx*nx+dy*ny; a.x+=nx*k;a.y+=ny*k;b.x+=nx*k;b.y+=ny*k; gesture.ops.forEach(o=>{o.x+=nx*k;o.y+=ny*k;}); gesture.last=w;
+      gesture.moved=(gesture.moved||0)+k; dragHint={x:w.x,y:w.y,t:'↔ '+Math.round(Math.abs(gesture.moved))+' cm'}; draw(); break;}
   }
 });
 function endPointer(e){
@@ -806,13 +830,17 @@ function buildPanel(onlyValues){
     <div class="row"><label for="p_len">Länge</label><div class="unit" data-u="cm"><input id="p_len" type="text" inputmode="decimal" enterkeyhint="done" value="${fmtNum(dispLen(w))}"></div></div>
     <div class="row"><label for="p_anchor">Fester Punkt</label><select id="p_anchor"><option value="a">Anfang (●)</option><option value="b">Ende (○)</option><option value="m">Mitte</option></select></div>
     <div class="row"><label for="p_t">Wandstärke</label><div class="unit" data-u="cm"><input id="p_t" type="text" inputmode="decimal" enterkeyhint="done" value="${fmtNum(w.t)}"></div></div>
-    <div class="note">Winkel ${ang}°. Angeschlossene Wände passen sich an.</div>
+    <div class="row"><label for="p_shift">Verschieben um</label><div class="unit" data-u="cm"><input id="p_shift" type="text" inputmode="decimal" enterkeyhint="done" placeholder="z. B. 20"></div></div>
+    <div class="actions"><button class="btn" id="p_sm" aria-label="Wand zur einen Seite verschieben">◀ Seite A</button><button class="btn" id="p_sp" aria-label="Wand zur anderen Seite verschieben">Seite B ▶</button></div>
+    <div class="note">Winkel ${ang}°. Die ausgewählte Wand lässt sich auch direkt mit Stift oder Finger ziehen. Angeschlossene Wände passen sich an.</div>
     <div class="actions"><button class="btn del" id="p_del">Wand löschen</button></div>`;
   }
   else if(selection.type==='room'){ const r=roomById(selection.id); if(!r){panel.hidden=true;return;}
     h=`<h2>Raum <small>${mlabel}</small></h2>
     <div class="row"><label for="p_name">Name</label><input id="p_name" class="wide" type="text" value="${esc(r.name)}"></div>
-    <div><div class="note">Wohnfläche</div><div class="stat">${(settings.measure==='inner'&&!isRect(r)?'≈ ':'')+fmtArea(roomArea(r))}</div></div>`;
+    <div><div class="note">Wohnfläche</div><div class="stat">${(settings.measure==='inner'&&!isRect(r)?'≈ ':'')+fmtArea(roomArea(r))}</div></div>
+    <div><div class="note">Flächenfarbe</div>${swatches(r.color)}</div>
+    <div class="row"><label for="p_pat">Bodenmuster</label><select id="p_pat">${PATTERNS.map(([k,n])=>`<option value="${k}"${(r.pattern||'')===k?' selected':''}>${n}</option>`).join('')}</select></div>`;
     if(isRect(r)){const d=rectDims(r); h+=`
       <div class="row"><label for="p_rw">Breite</label><div class="unit" data-u="cm"><input id="p_rw" type="text" inputmode="decimal" enterkeyhint="done" value="${fmtNum(d.w)}"></div></div>
       <div class="row"><label for="p_rh">Tiefe</label><div class="unit" data-u="cm"><input id="p_rh" type="text" inputmode="decimal" enterkeyhint="done" value="${fmtNum(d.h)}"></div></div>`;}
@@ -829,21 +857,29 @@ function buildPanel(onlyValues){
     <div class="row"><label for="p_rot">Drehung</label><div class="unit" data-u="°"><input id="p_rot" type="text" inputmode="numeric" enterkeyhint="done" value="${it.rot}"></div></div>
     <div class="actions"><button class="btn" id="p_rl" aria-label="90 Grad nach links drehen">↺ 90°</button><button class="btn" id="p_rr" aria-label="90 Grad nach rechts drehen">↻ 90°</button></div>
     ${(k==='door'||k==='door2'||k==='balcony')?`<div class="actions"><button class="btn" id="p_fx">Anschlag wechseln</button><button class="btn" id="p_fy">Aufschlag wechseln</button></div>`:''}
-    ${op?`<div class="note">Rastet in der nächsten Wand ein, wenn du es darauf ziehst.</div>`:''}
+    ${op?'':`<div><div class="note">Farbe</div>${swatches(it.color)}</div>`}
+    <div class="note">${op?'Zum Verschieben ziehen – rastet in der nächsten Wand ein.':'Zum Verschieben ziehen, am blauen Kreis drehen.'}</div>
     <div class="actions"><button class="btn" id="p_dup">Duplizieren</button><button class="btn del" id="p_del">Löschen</button></div>`;
   }
   panel.innerHTML=h; wirePanel();
 }
+function swatches(cur){ return `<div class="swatches" role="radiogroup" aria-label="Farbe">${FILLS.map(([c,n])=>`<button class="sw${(cur||null)===c?' on':''}" role="radio" aria-checked="${(cur||null)===c}" data-c="${c||''}" title="${n}" aria-label="${n}" style="${c?`background:${c}`:''}"></button>`).join('')}</div>`; }
+function wireSwatches(obj){ panel.querySelectorAll('.sw').forEach(b=>b.onclick=()=>{ checkpoint(); obj.color=b.dataset.c||null; commitUI(); }); }
 function onCommit(el,fn){ if(!el)return; const go=()=>{fn(el.value);}; el.addEventListener('change',go); el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();el.blur();}}); }
 function wirePanel(){
   const del=$('#p_del'); if(del)del.onclick=deleteSel;
   if(selection.type==='wall'){ const w=wallById(selection.id); const anc=$('#p_anchor'); anc.value=anchorPref; anc.onchange=()=>{anchorPref=anc.value;};
     onCommit($('#p_len'),v=>{const x=num(v); if(x==null||x<=1){buildPanel();return;} checkpoint(); setWallLength(w,x,anchorPref); commitUI();});
+    const shift=sign=>{ const x=num($('#p_shift').value)||10; checkpoint(); const a=node(w.a),b=node(w.b),L=dist(a,b)||1, nx=-(b.y-a.y)/L*x*sign, ny=(b.x-a.x)/L*x*sign;
+      openingsOn(w).forEach(o=>{o.x+=nx;o.y+=ny;});
+      a.x=Math.round((a.x+nx)*10)/10; a.y=Math.round((a.y+ny)*10)/10; b.x=Math.round((b.x+nx)*10)/10; b.y=Math.round((b.y+ny)*10)/10; commitUI(); };
+    $('#p_sm').onclick=()=>shift(-1); $('#p_sp').onclick=()=>shift(1);
     onCommit($('#p_t'),v=>{const x=num(v); if(x==null||x<=0||x>100){buildPanel();return;} checkpoint(); w.t=x; commitUI();}); }
   if(selection.type==='room'){ const r=roomById(selection.id);
     onCommit($('#p_name'),v=>{checkpoint(); r.name=v.trim()||r.name; commitUI();});
     $('#p_rrl').onclick=()=>{checkpoint(); rotateRoom(r,-1); commitUI();}; $('#p_rrr').onclick=()=>{checkpoint(); rotateRoom(r,1); commitUI();};
     $('#p_mir').onclick=()=>{checkpoint(); mirrorRoom(r); commitUI();};
+    wireSwatches(r); $('#p_pat').onchange=e=>{ checkpoint(); r.pattern=e.target.value||null; commitUI(); };
     onCommit($('#p_rw'),v=>{const x=num(v); if(x==null||x<=10){buildPanel();return;} checkpoint(); setRectSize(r,x,null); commitUI();});
     onCommit($('#p_rh'),v=>{const x=num(v); if(x==null||x<=10){buildPanel();return;} checkpoint(); setRectSize(r,null,x); commitUI();});
     panel.querySelectorAll('[data-wall]').forEach(el=>onCommit(el,v=>{const x=num(v); if(x==null||x<=1){buildPanel();return;} checkpoint(); setWallLength(wallById(el.dataset.wall),x,'a'); commitUI();})); }
@@ -855,6 +891,7 @@ function wirePanel(){
     $('#p_rl').onclick=()=>{checkpoint(); it.rot=(it.rot+270)%360; commitUI();};
     $('#p_rr').onclick=()=>{checkpoint(); it.rot=(it.rot+90)%360; commitUI();};
     const fx=$('#p_fx'),fy=$('#p_fy'); if(fx)fx.onclick=()=>{checkpoint(); it.fx*=-1; commitUI();}; if(fy)fy.onclick=()=>{checkpoint(); it.fy*=-1; commitUI();};
+    wireSwatches(it);
     $('#p_dup').onclick=()=>{checkpoint(); const c={...it,id:nid('i'),x:it.x+30,y:it.y+30}; state.items.push(c); selection={type:'item',id:c.id}; commitUI();}; }
 }
 
@@ -1015,12 +1052,20 @@ cv.addEventListener('pointerdown',()=>{ if(!exMenu.hidden)closeEx(); },true);
 $('#closeOverlay').onclick=()=>{$('#overlay').hidden=true;};
 $('#overlay').addEventListener('pointerdown',e=>{if(e.target.id==='overlay')$('#overlay').hidden=true;});
 
+/* ---------- Darstellung ---------- */
+const SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></svg>';
+function applyTheme(){ const t=settings.theme||'system'; if(t==='system')delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme=t;
+  $('#themeBtn').innerHTML=isDark()?SUN:MOON; $('#themeSel').value=t; const m=document.querySelector('meta[name="theme-color"]'); readPal(); if(m)m.content=pal.paper; draw(); if(!lib.hidden)buildLib(); }
+$('#themeBtn').onclick=()=>{ settings.theme=isDark()?'light':'dark'; save(); applyTheme(); toast(isDark()?'Dunkle Darstellung':'Helle Darstellung'); };
+$('#themeSel').onchange=e=>{ settings.theme=e.target.value; save(); applyTheme(); };
+
 /* ---------- Start ---------- */
-load(); readPal();
+load(); readPal(); applyTheme();
 wallT.value=fmtNum(settings.wallT); measure.value=settings.measure; fd.value=settings.fingerMode||'auto'; setTool(settings.tool||'draw');
 updateUndo();
 new ResizeObserver(()=>resize()).observe(cv);
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{readPal();draw();});
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>applyTheme());
 new MutationObserver(()=>{readPal();draw();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 document.fonts&&document.fonts.ready.then(()=>draw());
 requestAnimationFrame(()=>{resize(); fit(); if(state.example)toast('Beispielplan – leer starten über Einstellungen → Neuer Plan');});
