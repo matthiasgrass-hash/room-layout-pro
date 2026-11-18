@@ -8,7 +8,7 @@ Einfaches Grundriss-Programm für den Browser, gemacht fürs iPad mit Apple Penc
 - Raumvorlagen: Rechteck, Quadrat, L/T/U-Form, Dreiecke, Trapez, Erker, Sechseck …
 - Türen und Fenster rasten in Wänden ein
 - Standardmöbel aus dem Menü (Wohnen, Schlafen, Küche, Bad, Arbeiten)
-- Ausgewählte Wände, Türen, Fenster, Möbel und Räume per Stift oder Finger verschieben (Wände auch zentimetergenau)
+- Ausgewählte Wände, Türen, Fenster, Möbel und Räume per Stift oder Finger verschieben (Wände auch zentimetergenau); Endpunkt einer ausgewählten Wand ziehen ändert Länge und Winkel
 - Flächen farbig füllen (10 Farben) und Bodenmuster (Parkett, Fliesen, Dielen); Möbel einfärben
 - Helle und dunkle Darstellung (Mond-Symbol oben rechts)
 - Bibliothek mit Vorschaubildern für Räume, Türen, Fenster und Möbel

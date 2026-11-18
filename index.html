@@ -544,7 +544,8 @@ function draw(){
     c.setLineDash([6*px,5*px]); c.strokeStyle=pal.accent; c.lineWidth=2*px; c.stroke(); c.setLineDash([]);}}
   // Ecken im Bearbeiten-Modus
   if(settings.tool==='edit'){ state.nodes.forEach(n=>{c.beginPath();c.arc(n.x,n.y,6*px,0,Math.PI*2);c.fillStyle=pal.sheet;c.fill();c.lineWidth=2*px;c.strokeStyle=pal.accent;c.stroke();}); }
-  else if(selection?.type==='wall'){ const w=wallById(selection.id); if(w)[node(w.a),node(w.b)].forEach((n,i)=>{c.beginPath();c.arc(n.x,n.y,5*px,0,Math.PI*2);c.fillStyle=i===0?pal.accent:pal.sheet;c.fill();c.lineWidth=2*px;c.strokeStyle=pal.accent;c.stroke();}); }
+  else if(selection?.type==='wall'){ const w=wallById(selection.id); if(w)[node(w.a),node(w.b)].forEach((n,i)=>{ c.beginPath();c.arc(n.x,n.y,13*px,0,Math.PI*2);c.fillStyle=pal.soft;c.fill();
+    c.beginPath();c.arc(n.x,n.y,8*px,0,Math.PI*2);c.fillStyle=i===0?pal.accent:pal.sheet;c.fill();c.lineWidth=2.5*px;c.strokeStyle=pal.accent;c.stroke(); }); }
   // Live-Strich
   if(liveStroke&&liveStroke.length>1){ c.beginPath(); liveStroke.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y)); c.strokeStyle=pal.accent; c.lineWidth=2.5*px; c.lineCap='round'; c.lineJoin='round'; c.globalAlpha=.75; c.stroke(); c.globalAlpha=1; }
   if(dragHint){ c.font=`500 ${12*px}px ${fontNum}`; c.textAlign='left'; c.textBaseline='bottom'; c.lineWidth=3*px; c.strokeStyle=pal.paper; c.fillStyle=pal.accent;
@@ -643,6 +644,8 @@ function splitRoom(path){ // Trennwand teilt einen Raum in zwei
 function hitTest(p){
   const px=1/view.s;
   if(selection?.type==='item'){const it=itemById(selection.id); if(it&&dist(handlePos(it,px),p)<16*px)return {type:'handle',obj:it};}
+  if(selection?.type==='wall'){const w=wallById(selection.id); if(w){ const a=node(w.a),b=node(w.b), da=dist(a,p), db=dist(b,p), r=24*px;
+    if(Math.min(da,db)<r)return {type:'wend',obj:da<=db?a:b,wall:w}; }}
   const order=[...state.items.filter(i=>!OPENING[CAT[i.type]?.k]),...state.items.filter(i=>OPENING[CAT[i.type]?.k])].reverse();
   for(const it of order){ const l=toLocal(it,p), b=itemBox(it), m=6*px; if(l.x>=b.x0-m&&l.x<=b.x1+m&&l.y>=b.y0-m&&l.y<=b.y1+m)return {type:'item',obj:it}; }
   if(settings.tool==='edit'){const n=nearNode(p,16*px); if(n)return {type:'node',obj:n};}
@@ -662,6 +665,13 @@ function snapOpening(it){ const px=1/view.s; let best=null,bd=40*px;
   it.x=a.x+(b.x-a.x)*p.t; it.y=a.y+(b.y-a.y)*p.t; let ang=Math.atan2(b.y-a.y,b.x-a.x)/deg;
   if(Math.abs(angDiff(ang*deg,it.rot*deg))>Math.PI/2)ang+=180; it.rot=((Math.round(ang)%360)+360)%360; it.wt=best.t; return true; }
 
+function hostLine(n,wall){ // zwei weitere, gerade durchlaufende Wände am Knoten?
+  const others=wallsAt(n.id).filter(x=>x.id!==wall.id); if(others.length<2)return null;
+  for(let i=0;i<others.length;i++)for(let j=i+1;j<others.length;j++){
+    const A=node(others[i].a===n.id?others[i].b:others[i].a), B=node(others[j].a===n.id?others[j].b:others[j].a);
+    const L=dist(A,B); if(L<1)continue; const dx=(B.x-A.x)/L, dy=(B.y-A.y)/L;
+    if(distSeg(n,A,B)<2) return {px:A.x,py:A.y,dx,dy,t0:Math.min(30,L/2),t1:Math.max(L-30,L/2)}; }
+  return null; }
 function openingsOn(w){ const a=node(w.a),b=node(w.b); return state.items.filter(it=>OPENING[CAT[it.type]?.k]&&distSeg(it,a,b)<=w.t/2+3); }
 
 /* ---------- Eingabe ---------- */
@@ -679,7 +689,7 @@ cv.addEventListener('pointerdown',e=>{
     const touches=[...pointers.values()].filter(q=>q.type==='touch').length;
     if(touches>=2){ startPinch(); draw(); return; }
     if(!fingerDraws()){ const w=toW(p.x,p.y), hit=hitTest(w);
-      if(hit&&(hit.type==='handle'||hit.type==='wall'&&selection?.type==='wall'&&selection.id===hit.obj.id||hit.type==='item'&&selection?.type==='item'&&selection.id===hit.obj.id||hit.type==='room'&&selection?.type==='room'&&selection.id===hit.obj.id)){ primaryDown(p,true); return; }
+      if(hit&&(hit.type==='handle'||hit.type==='wend'||hit.type==='wall'&&selection?.type==='wall'&&selection.id===hit.obj.id||hit.type==='item'&&selection?.type==='item'&&selection.id===hit.obj.id||hit.type==='room'&&selection?.type==='room'&&selection.id===hit.obj.id)){ primaryDown(p,true); return; }
       gesture={kind:'pan',last:p,start:p,moved:false,tapPossible:true}; return; }
   }
   if(type==='mouse'&&(e.button===1||e.button===2||spaceDown)){ gesture={kind:'pan',last:p,start:p,moved:false}; return; }
@@ -689,6 +699,7 @@ cv.addEventListener('pointerdown',e=>{
 function primaryDown(p,byTouch){
   const w=toW(p.x,p.y); const hit=hitTest(w);
   if(hit?.type==='handle'){gesture={kind:'rotate',it:hit.obj,started:false,byTouch}; return;}
+  if(hit?.type==='wend'){ const w=hit.wall; gesture={kind:'node',n:hit.obj,wall:w,fixed:node(w.a===hit.obj.id?w.b:w.a),start:p,started:false,byTouch}; return; }
   if(hit?.type==='item'){ select(hit); gesture={kind:'item',it:hit.obj,off:{x:w.x-hit.obj.x,y:w.y-hit.obj.y},start:p,started:false,byTouch}; return; }
   if(hit?.type==='room'&&(settings.tool==='edit'||(selection?.type==='room'&&selection.id===hit.obj.id))){
     select(hit); gesture={kind:'room',r:hit.obj,last:w,start:p,started:false,byTouch}; return; }
@@ -719,10 +730,26 @@ cv.addEventListener('pointermove',e=>{
       dragHint={x:w.x,y:w.y,t:it.rot+'°'}; draw(); buildPanel(true); break;}
     case 'node':{ if(!gesture.started){ if(dist(p,gesture.start)<4)return; checkpoint(); gesture.started=true; }
       const n=gesture.n; let w=toW(p.x,p.y); const thr=10*px;
-      wallsAt(n.id).forEach(wl=>{const o=node(wl.a===n.id?wl.b:wl.a); if(Math.abs(w.x-o.x)<thr)w.x=o.x; if(Math.abs(w.y-o.y)<thr)w.y=o.y;});
-      const other=nearNode(w,14*px,new Set([n.id])); if(other){w={x:other.x,y:other.y};}
-      moveNode(n,Math.round(w.x),Math.round(w.y)); gesture.merge=other;
-      const ws=wallsAt(n.id); dragHint=ws.length?{x:n.x,y:n.y,t:ws.map(x=>fmtLen(dispLen(x))).join(' · ')}:null; draw(); break;}
+      if(!gesture.ops&&gesture.wall)gesture.ops=openingsOn(gesture.wall);
+      let other=nearNode(w,14*px,new Set([n.id]));
+      if(other){ w={x:other.x,y:other.y}; }
+      else if(gesture.wall&&hostLine(n,gesture.wall)){ // T-Anschluss: Endpunkt gleitet an der durchgehenden Wand entlang
+        const H=hostLine(n,gesture.wall), o=gesture.fixed; const t=Math.max(H.t0,Math.min(H.t1,(w.x-H.px)*H.dx+(w.y-H.py)*H.dy));
+        w={x:H.px+H.dx*t,y:H.py+H.dy*t};
+        const a=Math.atan2(w.y-o.y,w.x-o.x), s45=Math.round(a/(Math.PI/4))*(Math.PI/4);
+        if(Math.abs(angDiff(a,s45))<6*deg){ const ip=intersect({px:o.x,py:o.y,dx:Math.cos(s45),dy:Math.sin(s45)},H); if(ip){const ti=(ip.x-H.px)*H.dx+(ip.y-H.py)*H.dy; if(ti>=H.t0&&ti<=H.t1)w=ip;} } }
+      else if(gesture.wall){ // Winkel einrasten: 90°/45° stark, 15° schwach
+        const o=gesture.fixed, L=Math.max(1,Math.hypot(w.x-o.x,w.y-o.y)), a=Math.atan2(w.y-o.y,w.x-o.x);
+        const s45=Math.round(a/(Math.PI/4))*(Math.PI/4), s15=Math.round(a/(Math.PI/12))*(Math.PI/12);
+        let sa=a; if(Math.abs(angDiff(a,s45))<6*deg)sa=s45; else if(Math.abs(angDiff(a,s15))<3*deg)sa=s15;
+        const Lr=Math.round(L); w={x:o.x+Math.cos(sa)*Lr,y:o.y+Math.sin(sa)*Lr};
+        wallsAt(n.id).forEach(wl=>{ if(wl.id===gesture.wall.id)return; const q=node(wl.a===n.id?wl.b:wl.a); if(Math.abs(w.x-q.x)<thr)w.x=q.x; if(Math.abs(w.y-q.y)<thr)w.y=q.y; }); }
+      else { wallsAt(n.id).forEach(wl=>{const o=node(wl.a===n.id?wl.b:wl.a); if(Math.abs(w.x-o.x)<thr)w.x=o.x; if(Math.abs(w.y-o.y)<thr)w.y=o.y;}); }
+      moveNode(n,Math.round(w.x*10)/10,Math.round(w.y*10)/10); gesture.merge=other;
+      if(gesture.wall){ const o=gesture.fixed; const ang=((Math.round(Math.atan2(-(n.y-o.y),n.x-o.x)/deg)%360)+360)%360;
+        dragHint={x:n.x,y:n.y,t:fmtLen(dispLen(gesture.wall))+' · '+ang+'°'}; }
+      else { const ws=wallsAt(n.id); dragHint=ws.length?{x:n.x,y:n.y,t:ws.map(x=>fmtLen(dispLen(x))).join(' · ')}:null; }
+      draw(); break;}
     case 'room':{ if(!gesture.started){ if(dist(p,gesture.start)<4)return; checkpoint(); gesture.started=true; }
       const w=toW(p.x,p.y); const dx=Math.round(w.x-gesture.last.x), dy=Math.round(w.y-gesture.last.y); if(!dx&&!dy)return;
       moveRoom(gesture.r,dx,dy); gesture.last={x:gesture.last.x+dx,y:gesture.last.y+dy}; draw(); break;}
@@ -746,7 +773,7 @@ function endPointer(e){
       if(e.type==='pointercancel'){draw();return;}
       if(commitStroke(g.pts)){commitUI();} else draw(); break;}
     case 'item': case 'rotate': case 'wall': case 'room': if(g.started)commitUI(); else draw(); break;
-    case 'node': if(g.started){ if(g.merge)mergeNodes(g.merge.id,g.n.id); cleanup(); validateSel(); commitUI(); } else draw(); break;
+    case 'node': if(g.started){ (g.ops||[]).forEach(o=>snapOpening(o)); if(g.merge)mergeNodes(g.merge.id,g.n.id); cleanup(); validateSel(); commitUI(); } else draw(); break;
   }
 }
 cv.addEventListener('pointerup',endPointer); cv.addEventListener('pointercancel',endPointer);
@@ -825,14 +852,14 @@ function buildPanel(onlyValues){
   panel.hidden=false; let h='';
   const mlabel=settings.measure==='inner'?'Innenmaß':'Achsmaß';
   if(selection.type==='wall'){ const w=wallById(selection.id); if(!w){panel.hidden=true;return;}
-    const ang=((Math.round(Math.atan2(node(w.b).y-node(w.a).y,node(w.b).x-node(w.a).x)/deg)%360)+360)%360;
+    const ang=((Math.round(Math.atan2(-(node(w.b).y-node(w.a).y),node(w.b).x-node(w.a).x)/deg)%360)+360)%360;
     h=`<h2>Wand <small>${mlabel}</small></h2>
     <div class="row"><label for="p_len">Länge</label><div class="unit" data-u="cm"><input id="p_len" type="text" inputmode="decimal" enterkeyhint="done" value="${fmtNum(dispLen(w))}"></div></div>
     <div class="row"><label for="p_anchor">Fester Punkt</label><select id="p_anchor"><option value="a">Anfang (●)</option><option value="b">Ende (○)</option><option value="m">Mitte</option></select></div>
     <div class="row"><label for="p_t">Wandstärke</label><div class="unit" data-u="cm"><input id="p_t" type="text" inputmode="decimal" enterkeyhint="done" value="${fmtNum(w.t)}"></div></div>
     <div class="row"><label for="p_shift">Verschieben um</label><div class="unit" data-u="cm"><input id="p_shift" type="text" inputmode="decimal" enterkeyhint="done" placeholder="z. B. 20"></div></div>
     <div class="actions"><button class="btn" id="p_sm" aria-label="Wand zur einen Seite verschieben">◀ Seite A</button><button class="btn" id="p_sp" aria-label="Wand zur anderen Seite verschieben">Seite B ▶</button></div>
-    <div class="note">Winkel ${ang}°. Die ausgewählte Wand lässt sich auch direkt mit Stift oder Finger ziehen. Angeschlossene Wände passen sich an.</div>
+    <div class="note">Winkel ${ang}°. Wand ziehen = parallel verschieben. <b>Endpunkt</b> (Kreis) ziehen = Länge und Winkel ändern, rastet bei 90°/45° ein. Angeschlossene Wände passen sich an.</div>
     <div class="actions"><button class="btn del" id="p_del">Wand löschen</button></div>`;
   }
   else if(selection.type==='room'){ const r=roomById(selection.id); if(!r){panel.hidden=true;return;}
