@@ -3,8 +3,10 @@
 Einfaches Grundriss-Programm für den Browser, gemacht fürs iPad mit Apple Pencil.
 
 - Wände mit dem Stift zeichnen – Linien werden automatisch begradigt (0°/45°/90°)
-- Geschlossene Formen werden zu Räumen mit Fläche in m²
+- Geschlossene Formen werden zu Räumen mit Fläche in m²; kleine geschlossene Formen (bis 90 cm) werden zu Säulen (eckig oder rund)
+- Abgerundete Ecken beim Zeichnen in einem Zug werden zu sauberen Ecken
 - Maße per Eingabe setzen (Innen- oder Achsmaß)
+- Säulen, Schornstein, Treppe und Wandvorsprung als Bauteile
 - Raumvorlagen: Rechteck, Quadrat, L/T/U-Form, Dreiecke, Trapez, Erker, Sechseck …
 - Türen und Fenster rasten in Wänden ein
 - Standardmöbel aus dem Menü (Wohnen, Schlafen, Küche, Bad, Arbeiten)

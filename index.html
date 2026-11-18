@@ -251,6 +251,9 @@ const CATALOG=[
   ['waschbecken','Waschbecken',60,45,'basin'],['waschmaschine','Waschmaschine',60,60,'washer']]],
  ['Arbeiten',[
   ['schreibtisch','Schreibtisch',140,70,'table'],['buerostuhl','Bürostuhl',60,60,'office'],['aktenschrank','Aktenschrank',80,40,'cabinet']]],
+ ['Bauteile',[
+  ['saeule','Säule eckig',30,30,'pillar'],['saeule_rund','Säule rund',30,30,'pillarRound'],['schornstein','Schornstein',40,40,'chimney'],
+  ['treppe','Treppe gerade',100,300,'stairs'],['vorsprung','Wandvorsprung',40,20,'pillar']]],
  ['Türen',[
   ['tuer70','Tür 70 cm',70,0,'door'],['tuer80','Tür 80 cm',80,0,'door'],['tuer90','Tür 90 cm',90,0,'door'],['haustuer','Haustür 100 cm',100,0,'door'],
   ['tuer2','Doppeltür 160 cm',160,0,'door2'],['schiebetuer','Schiebetür 100 cm',100,0,'slider'],['durchgang','Durchgang 90 cm',90,0,'gap']]],
@@ -437,6 +440,11 @@ function drawItem(c,it,P,px,isSel){
       for(let i=0;i<n;i++)R(x0+g+i*(pw+g),y0+g,pw,ph,7); const by=y0+g*2+ph+4; c.beginPath();c.moveTo(x0,by);c.lineTo(w/2,by);c.stroke();
       c.beginPath();c.moveTo(x0,by+14);c.lineTo(w/2-w*.25,by+14);c.lineTo(w/2,by+14+w*.12);c.stroke(); break;}
     case 'table': R(x0,y0,w,d,3); break;
+    case 'pillar':{ c.fillStyle=it.color||P.ink; c.fillRect(x0,y0,w,d); if(!isSel)c.strokeStyle=c.fillStyle; c.strokeRect(x0,y0,w,d); break;}
+    case 'pillarRound':{ c.fillStyle=it.color||P.ink; c.beginPath(); c.ellipse(0,0,w/2,d/2,0,0,Math.PI*2); c.fill(); if(!isSel)c.strokeStyle=c.fillStyle; c.stroke(); break;}
+    case 'chimney':{ c.fillStyle=it.color||P.ink; c.fillRect(x0,y0,w,d); c.strokeStyle=c.fillStyle; c.strokeRect(x0,y0,w,d); c.fillStyle=P.paper; const m=Math.min(w,d)*.22; c.fillRect(x0+m,y0+m,w-2*m,d-2*m); c.strokeStyle=P.paper; c.lineWidth=1.2*px; c.beginPath(); c.moveTo(x0+m,y0+m); c.lineTo(w/2-m,d/2-m); c.moveTo(w/2-m,y0+m); c.lineTo(x0+m,d/2-m); c.stroke(); break;}
+    case 'stairs':{ R(x0,y0,w,d,0); const n=Math.max(3,Math.round(d/28)); for(let i=1;i<n;i++)Ln(x0,y0+d*i/n,w/2,y0+d*i/n);
+      c.beginPath(); c.moveTo(0,d/2-8); c.lineTo(0,y0+12); c.stroke(); c.beginPath(); c.moveTo(-6,y0+22); c.lineTo(0,y0+12); c.lineTo(6,y0+22); c.stroke(); break;}
     case 'round': E(0,0,w/2,d/2); break;
     case 'chair': R(x0,y0+d*.2,w,d*.8,6); R(x0+2,y0,w-4,d*.2,3); break;
     case 'office': E(0,d*.05,w*.42,d*.4); R(x0+w*.12,y0,w*.76,d*.16,5); break;
@@ -572,35 +580,60 @@ function intersect(L1,L2){ const cr=L1.dx*L2.dy-L1.dy*L2.dx; if(Math.abs(cr)<1e-
   const t=((L2.px-L1.px)*L2.dy-(L2.py-L1.py)*L2.dx)/cr; return {x:L1.px+t*L1.dx,y:L1.py+t*L1.dy}; }
 function proj(p,L){ const t=(p.x-L.px)*L.dx+(p.y-L.py)*L.dy; return {x:L.px+t*L.dx,y:L.py+t*L.dy}; }
 
+function rdpIdx(pts,eps,i0,i1,out){ let dm=-1,idx=-1; const a=pts[i0],b=pts[i1];
+  for(let i=i0+1;i<i1;i++){const d=distSeg(pts[i],a,b); if(d>dm){dm=d;idx=i;}}
+  if(dm>eps){ rdpIdx(pts,eps,i0,idx,out); out.push(idx); rdpIdx(pts,eps,idx,i1,out); } }
 function straighten(raw){
-  const px=1/view.s; let len=0; for(let i=1;i<raw.length;i++)len+=dist(raw[i],raw[i-1]);
-  let S=rdp(raw,Math.max(10*px,Math.min(.045*len,40*px)));
-  const minSeg=Math.max(18*px,.05*len);
-  // kurze Stücke entfernen
-  let K=[S[0]]; for(let i=1;i<S.length-1;i++){ if(dist(S[i],K[K.length-1])>=minSeg && dist(S[i],S[S.length-1])>=minSeg*.6)K.push(S[i]); } K.push(S[S.length-1]); S=K;
-  let closed=S.length>=4 && dist(S[0],S[S.length-1])<Math.max(36*px,.14*len);
-  let pts=closed?S.slice(0,-1):S;
-  const n=pts.length;
-  let segs=[]; const segCount=closed?n:n-1;
-  for(let i=0;i<segCount;i++){const p=pts[i],q=pts[(i+1)%n]; segs.push({p,q,a:snapAng(Math.atan2(q.y-p.y,q.x-p.x))});}
-  // gleiche Richtung zusammenfassen
-  let merged=[]; segs.forEach(sg=>{const l=merged[merged.length-1]; if(l&&Math.abs(angDiff(l.a,sg.a))<1e-6){l.q=sg.q;}else merged.push({...sg});});
-  if(closed&&merged.length>1&&Math.abs(angDiff(merged[0].a,merged[merged.length-1].a))<1e-6){const l=merged.pop(); merged[0].p=l.p;}
-  if(closed&&merged.length<3)closed=false;
-  const lines=merged.map(sg=>({px:(sg.p.x+sg.q.x)/2,py:(sg.p.y+sg.q.y)/2,dx:Math.cos(sg.a),dy:Math.sin(sg.a),p:sg.p,q:sg.q}));
+  const px=1/view.s, N=raw.length; let len=0; for(let i=1;i<N;i++)len+=dist(raw[i],raw[i-1]);
+  const eps=Math.max(7*px,Math.min(.03*len,22*px));
+  const idx=[0]; rdpIdx(raw,eps,0,N-1,idx); idx.push(N-1);
+  let closed=idx.length>=4 && dist(raw[0],raw[N-1])<Math.max(36*px,.12*len);
+  const segL=sg=>{ const p=raw[sg.i0], q=raw[sg.i1]; return dist(p,q); };
+  const rawAng=sg=>Math.atan2(raw[sg.i1].y-raw[sg.i0].y,raw[sg.i1].x-raw[sg.i0].x);
+  let segs=[]; for(let k=0;k<idx.length-1;k++)segs.push({i0:idx[k],i1:idx[k+1]});
+  // winzige Zitter-Stücke entfernen
+  segs=segs.filter(sg=>segL(sg)>=10*px||segs.length<=1);
+  // lückenlos machen und Richtung einrasten
+  for(let k=1;k<segs.length;k++)segs[k].i0=segs[k-1].i1=Math.round((segs[k-1].i1+segs[k].i0)/2);
+  const snapAll=()=>segs.forEach(sg=>{sg.a=snapAng(rawAng(sg)); sg.L=segL(sg);});
+  const mergeSame=()=>{ const out=[]; segs.forEach(sg=>{const l=out[out.length-1]; if(l&&Math.abs(angDiff(l.a,sg.a))<1e-6){l.i1=sg.i1; l.L=segL(l);} else out.push({...sg});});
+    if(closed&&out.length>2&&Math.abs(angDiff(out[0].a,out[out.length-1].a))<1e-6){const l=out.pop(); out[0].wrapFrom=l.i0; out[0].L+=l.L;} segs=out; };
+  snapAll(); mergeSame();
+  // Fasen an abgerundeten Ecken und Haken am Strichende entfernen
+  for(let guard=0;guard<20;guard++){ let removed=false; const n=segs.length;
+    for(let k=0;k<n&&!removed;k++){ const sg=segs[k];
+      const prev=closed?segs[(k-1+n)%n]:segs[k-1], next=closed?segs[(k+1)%n]:segs[k+1];
+      if(prev&&next){ if(n>(closed?3:2)&&sg.L<.4*Math.min(prev.L,next.L)&&sg.L<60*px){ segs.splice(k,1); removed=true; } }
+      else if(n>1){ const nb=prev||next; if(sg.L<.25*nb.L&&sg.L<35*px){ segs.splice(k,1); removed=true; } } }
+    if(!removed)break; mergeSame(); }
+  if(closed&&segs.length<3)closed=false;
+  // Linie durch den Schwerpunkt der Rohpunkte (Ecken-Rundungen abgeschnitten)
+  const lines=segs.map(sg=>{ const ids=[]; if(sg.wrapFrom!=null){ for(let i=sg.wrapFrom;i<N;i++)ids.push(i); for(let i=0;i<=sg.i1;i++)ids.push(i); } else for(let i=sg.i0;i<=sg.i1;i++)ids.push(i);
+    const cut=Math.floor(ids.length*.2), use=ids.length>4?ids.slice(cut,ids.length-cut):ids;
+    const cx=use.reduce((s,i)=>s+raw[i].x,0)/use.length, cy=use.reduce((s,i)=>s+raw[i].y,0)/use.length;
+    return {px:cx,py:cy,dx:Math.cos(sg.a),dy:Math.sin(sg.a),p:raw[sg.wrapFrom??sg.i0],q:raw[sg.i1]}; });
   const safe=(c,fallback,Lnext)=>{ if(!c||dist(c,fallback)>Math.max(len*.5,60*px))return proj(fallback,Lnext); return c; };
   let corners=[];
   if(closed){ for(let i=0;i<lines.length;i++){const L0=lines[(i-1+lines.length)%lines.length],L1=lines[i]; corners.push(safe(intersect(L0,L1),L1.p,L1));} }
-  else{ corners.push(proj(raw[0],lines[0])); for(let i=1;i<lines.length;i++)corners.push(safe(intersect(lines[i-1],lines[i]),lines[i].p,lines[i]));
-    corners.push(proj(raw[raw.length-1],lines[lines.length-1])); }
+  else{ corners.push(proj(raw[segs[0].i0],lines[0])); for(let i=1;i<lines.length;i++)corners.push(safe(intersect(lines[i-1],lines[i]),lines[i].p,lines[i]));
+    corners.push(proj(raw[segs[segs.length-1].i1],lines[lines.length-1])); }
   corners=corners.map(p=>({x:Math.round(p.x),y:Math.round(p.y)}));
-  return {corners,closed,len};
+  // Kleine geschlossene Form = Säule
+  let pillar=null; if(closed||dist(raw[0],raw[N-1])<Math.max(30*px,.2*len)){
+    const xs=raw.map(p=>p.x), ys=raw.map(p=>p.y), bw=Math.max(...xs)-Math.min(...xs), bh=Math.max(...ys)-Math.min(...ys);
+    if(Math.max(bw,bh)<=90){ const round=len/(2*(bw+bh))<.88; const r5=v=>Math.max(10,Math.round(v/5)*5);
+      pillar={round,x:Math.round((Math.max(...xs)+Math.min(...xs))/2),y:Math.round((Math.max(...ys)+Math.min(...ys))/2),
+        w:round?r5((bw+bh)/2):r5(bw),d:round?r5((bw+bh)/2):r5(bh)}; } }
+  return {corners,closed,len,pillar};
 }
 function nearNode(p,r,exclude){ let best=null,bd=r; state.nodes.forEach(n=>{if(exclude&&exclude.has(n.id))return; const d=dist(n,p); if(d<bd){bd=d;best=n;}}); return best; }
 function nearWall(p,r){ let best=null,bd=r; state.walls.forEach(w=>{const d=distSeg(p,node(w.a),node(w.b)); if(d<bd){bd=d;best=w;}}); return best; }
 
 function commitStroke(raw){
-  const px=1/view.s; const {corners,closed,len}=straighten(raw);
+  const px=1/view.s; const {corners,closed,len,pillar}=straighten(raw);
+  if(pillar){ checkpoint(); const t=pillar.round?'saeule_rund':'saeule';
+    const it={id:nid('i'),type:t,name:pillar.round?`Säule Ø${pillar.w}`:`Säule ${pillar.w}×${pillar.d}`,x:pillar.x,y:pillar.y,w:pillar.w,d:pillar.d,rot:0,fx:1,fy:1,wt:24};
+    state.items.push(it); selection={type:'item',id:it.id}; toast('Säule erkannt – Maße rechts anpassen'); return true; }
   if(corners.length<2||len<20*px)return false;
   checkpoint();
   const snapR=24*px; const t=settings.wallT;
@@ -950,8 +983,9 @@ function thumbShape(cnv,key){ const pts=SHAPES.find(x=>x[0]===key)[2]();
     c.fillStyle=pal.room; c.fill(); c.lineWidth=3.5; c.lineJoin='miter'; c.strokeStyle=pal.ink; c.stroke(); }); }
 function buildLib(){ document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.tab===libTab));
   let groups=[];
-  if(libTab==='rooms')groups=[['Grundformen',SHAPES.slice(0,6).map(([k,n])=>({k,n,shape:true}))],['Schräge Formen',SHAPES.slice(6).map(([k,n])=>({k,n,shape:true}))]];
-  else groups=CATALOG.filter(([g])=>(libTab==='openings')===(g==='Türen'||g==='Fenster')).map(([g,list])=>[g,list.map(([t,n,w,d])=>({k:t,n,dim:d?`${w}×${d}`:`${w} cm`}))]);
+  const catG=g=>CATALOG.filter(x=>x[0]===g).map(([g,list])=>[g==='Bauteile'?'Säulen & Bauteile':g,list.map(([t,n,w,d])=>({k:t,n,dim:d?`${w}×${d}`:`${w} cm`}))]);
+  if(libTab==='rooms')groups=[['Grundformen',SHAPES.slice(0,6).map(([k,n])=>({k,n,shape:true}))],['Schräge Formen',SHAPES.slice(6).map(([k,n])=>({k,n,shape:true}))],...catG('Bauteile')];
+  else groups=CATALOG.filter(([g])=>g!=='Bauteile'&&(libTab==='openings')===(g==='Türen'||g==='Fenster')).map(([g,list])=>[g,list.map(([t,n,w,d])=>({k:t,n,dim:d?`${w}×${d}`:`${w} cm`}))]);
   libBody.innerHTML=groups.map(([g,list])=>`<h3>${g}</h3><div class="grid">${list.map(o=>`<button class="tile" data-k="${o.k}" data-shape="${o.shape?1:''}"><canvas></canvas><b>${o.n.replace(/ \d+ cm$| \d+×\d+$/,'')}</b>${o.dim?`<small>${o.dim}</small>`:''}</button>`).join('')}</div>`).join('');
   libBody.querySelectorAll('.tile').forEach(t=>{ const cnv=t.querySelector('canvas'); t.dataset.shape?thumbShape(cnv,t.dataset.k):thumbItem(cnv,t.dataset.k);
     t.onclick=()=>{ openLib(false); t.dataset.shape?addShape(t.dataset.k):addFurniture(t.dataset.k); }; }); }
@@ -1064,8 +1098,8 @@ function exportDxf(){
     line('WAENDE_ACHSE',a,b); });
   // Möbel und Öffnungen
   const rec=makeRecorder((k,layer,p,q)=>line(layer,p,q)); const keep=view.s; view.s=1;
-  state.items.forEach(it=>{ const op=OPENING[CAT[it.type]?.k]; rec.layer=op?'OEFFNUNGEN':'MOEBEL'; rec.setTransform(1,0,0,1,0,0); drawItem(rec,it,LIGHT,1,false);
-    if(!op)text('MOEBEL_TEXT',{x:it.x,y:it.y},Math.min(60,Math.max(25,it.w*1.2)),it.name,0); });
+  state.items.forEach(it=>{ const op=OPENING[CAT[it.type]?.k], bt=['pillar','pillarRound','chimney','stairs'].includes(CAT[it.type]?.k); rec.layer=op?'OEFFNUNGEN':bt?'BAUTEILE':'MOEBEL'; rec.setTransform(1,0,0,1,0,0); drawItem(rec,it,LIGHT,1,false);
+    if(!op&&!bt)text('MOEBEL_TEXT',{x:it.x,y:it.y},Math.min(60,Math.max(25,it.w*1.2)),it.name,0); });
   view.s=keep;
   // Räume und Maße
   state.rooms.forEach(r=>{ const P=roomPoly(r); if(P.length<3)return; const c=centroid(P);
@@ -1073,7 +1107,7 @@ function exportDxf(){
   state.walls.forEach(w=>{ const a=node(w.a),b=node(w.b),L=dist(a,b); if(L<20)return; const nx=-(b.y-a.y)/L,ny=(b.x-a.x)/L, off=w.t/2+14;
     let ang=Math.atan2(-(b.y-a.y),b.x-a.x)/deg; if(ang>90)ang-=180; if(ang<-90)ang+=180;
     text('MASSE',{x:(a.x+b.x)/2+nx*off,y:(a.y+b.y)/2+ny*off},90,fmtLen(dispLen(w)),ang); });
-  const layers=[['WAENDE',7],['WAENDE_ACHSE',8],['OEFFNUNGEN',4],['MOEBEL',3],['MOEBEL_TEXT',3],['RAEUME',5],['RAUMNAMEN',5],['MASSE',1]];
+  const layers=[['WAENDE',7],['WAENDE_ACHSE',8],['OEFFNUNGEN',4],['BAUTEILE',7],['MOEBEL',3],['MOEBEL_TEXT',3],['RAEUME',5],['RAUMNAMEN',5],['MASSE',1]];
   out.push('0','SECTION','2','HEADER','9','$ACADVER','1','AC1009','9','$INSUNITS','70','4','0','ENDSEC');
   out.push('0','SECTION','2','TABLES','0','TABLE','2','LTYPE','70','1','0','LTYPE','2','CONTINUOUS','70','0','3','Solid line','72','65','73','0','40','0.0','0','ENDTAB');
   out.push('0','TABLE','2','LAYER','70',String(layers.length)); layers.forEach(([n,c])=>out.push('0','LAYER','2',n,'70','0','62',String(c),'6','CONTINUOUS')); out.push('0','ENDTAB','0','ENDSEC');
