@@ -13,7 +13,7 @@ Einfaches Grundriss-Programm für den Browser, gemacht fürs iPad mit Apple Penc
 - Helle und dunkle Darstellung (Mond-Symbol oben rechts)
 - Bibliothek mit Vorschaubildern für Räume, Türen, Fenster und Möbel
 - Export als Bild (PNG), maßstäbliches PDF (1:50/1:100/1:200) und CAD-Datei (DXF, mm, mit Layern)
-- Rückgängig/Wiederholen, automatisches Speichern im Browser
+- Alles löschen (Papierkorb oben rechts, mit Rückfrage), Rückgängig/Wiederholen, automatisches Speichern im Browser
 
 ## Bedienung
 

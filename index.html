@@ -91,6 +91,7 @@ button,select,input{font:inherit;color:var(--ink)}
 .btn.menu{flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border:1px solid var(--line);background:var(--sheet);text-align:left;white-space:normal;width:100%}
 .btn.menu span{color:var(--muted);font-size:12px;font-weight:400}
 .btn.menu.danger b{color:var(--danger)}
+.actions .btn.danger-fill{background:var(--danger);border-color:var(--danger);color:#fff}
 .field{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
 .field input{width:54px;min-height:36px;border:1px solid var(--line);border-radius:8px;background:var(--sheet);padding:0 8px;font-family:var(--f-num);text-align:right}
 .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);min-height:40px;padding:0 6px;cursor:pointer}
@@ -161,6 +162,7 @@ button,select,input{font:inherit;color:var(--ink)}
     </div>
     <div class="spacer"></div>
     <div class="pill">
+      <button class="btn icon" id="clearBtn" title="Alles löschen" aria-label="Alles löschen" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
       <button class="btn icon" id="themeBtn" title="Hell / Dunkel" aria-label="Hell oder dunkel umschalten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></svg></button>
       <button class="btn icon" id="settingsBtn" title="Einstellungen" aria-label="Einstellungen" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
       <button class="btn primary" id="export" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Exportieren</button>
@@ -197,13 +199,17 @@ button,select,input{font:inherit;color:var(--ink)}
     <button class="btn menu" id="exPdf"><b>PDF</b><span>Maßstäblich zum Drucken (1:50 / 1:100)</span></button>
     <button class="btn menu" id="exDxf"><b>CAD</b><span>DXF für AutoCAD, LibreCAD, ArchiCAD … (mm)</span></button>
   </div>
+  <div class="settings" id="clearMenu" hidden role="dialog" aria-labelledby="clearTitle">
+    <strong id="clearTitle">Alles löschen?</strong>
+    <div class="note">Alle Wände, Räume, Türen, Fenster und Möbel werden entfernt. Mit „Rückgängig“ holst du den Plan zurück.</div>
+    <div class="actions"><button class="btn" id="clearNo">Abbrechen</button><button class="btn danger-fill" id="clearYes">Alles löschen</button></div>
+  </div>
   <div class="settings" id="settings" hidden>
     <div class="row"><label for="wallT">Wandstärke neu</label><div class="unit" data-u="cm"><input id="wallT" type="text" inputmode="decimal" value="12"></div></div>
     <div class="row"><label for="measure">Maße anzeigen als</label><select id="measure"><option value="inner">Innenmaß</option><option value="axis">Achsmaß</option></select></div>
     <div class="row"><label for="themeSel">Darstellung</label><select id="themeSel"><option value="system">Wie System</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></div>
     <div class="row"><label for="fingerMode">Finger auf dem Display</label><select id="fingerMode"><option value="auto">Automatisch</option><option value="draw">Zeichnet</option><option value="pan">Verschiebt nur</option></select></div>
     <div class="note">Automatisch: Der Finger zeichnet, bis ein Apple Pencil benutzt wird. Danach zeichnet nur der Stift und der Finger verschiebt. Mit zwei Fingern verschieben und zoomen geht immer.</div>
-    <button class="btn menu danger" id="clear"><b>Neuer Plan</b><span>Alles löschen und leer beginnen</span></button>
   </div>
 
   <aside class="panel" id="panel" hidden aria-live="polite"></aside>
@@ -687,16 +693,17 @@ cv.addEventListener('pointerdown',e=>{
   if(document.activeElement&&document.activeElement.blur&&document.activeElement!==document.body)document.activeElement.blur();
   if(type==='touch'){
     const touches=[...pointers.values()].filter(q=>q.type==='touch').length;
-    if(touches>=2){ startPinch(); draw(); return; }
+    if(touches>=2){ if(gesture&&gesture.started&&['wall','item','node','room','rotate'].includes(gesture.kind)&&undoStack.length){ state=JSON.parse(undoStack.pop()); updateUndo(); validateSel(); }
+      startPinch(); draw(); return; }
     if(!fingerDraws()){ const w=toW(p.x,p.y), hit=hitTest(w);
       if(hit&&(hit.type==='handle'||hit.type==='wend'||hit.type==='wall'&&selection?.type==='wall'&&selection.id===hit.obj.id||hit.type==='item'&&selection?.type==='item'&&selection.id===hit.obj.id||hit.type==='room'&&selection?.type==='room'&&selection.id===hit.obj.id)){ primaryDown(p,true); return; }
       gesture={kind:'pan',last:p,start:p,moved:false,tapPossible:true}; return; }
   }
   if(type==='mouse'&&(e.button===1||e.button===2||spaceDown)){ gesture={kind:'pan',last:p,start:p,moved:false}; return; }
   if(type==='pen'){ penDown=true; if(!settings.penSeen&&settings.fingerMode==='auto'){settings.penSeen=true; save(); toast('Stift erkannt – ab jetzt verschiebt der Finger den Plan');} }
-  primaryDown(p,type==='touch');
+  primaryDown(p,type==='touch',type==='mouse');
 });
-function primaryDown(p,byTouch){
+function primaryDown(p,byTouch,byMouse){
   const w=toW(p.x,p.y); const hit=hitTest(w);
   if(hit?.type==='handle'){gesture={kind:'rotate',it:hit.obj,started:false,byTouch}; return;}
   if(hit?.type==='wend'){ const w=hit.wall; gesture={kind:'node',n:hit.obj,wall:w,fixed:node(w.a===hit.obj.id?w.b:w.a),start:p,started:false,byTouch}; return; }
@@ -710,6 +717,8 @@ function primaryDown(p,byTouch){
     if(hit?.type==='wall'){select(hit); gesture={kind:'wall',w:hit.obj,last:w,start:p,started:false,byTouch}; return;}
     gesture={kind:'pan',last:p,start:p,moved:false,tapPossible:true,hit,byTouch}; return;
   }
+  // Etwas ist ausgewählt: Finger/Maus auf freier Fläche verschiebt die Ansicht, Tippen hebt die Auswahl auf
+  if(selection&&(byTouch||byMouse)){ gesture={kind:'pan',last:p,start:p,moved:false,tapPossible:true,hit,byTouch}; return; }
   gesture={kind:'draw',pts:[w],start:p,hit,byTouch}; liveStroke=gesture.pts;
 }
 cv.addEventListener('pointermove',e=>{
@@ -859,7 +868,7 @@ function buildPanel(onlyValues){
     <div class="row"><label for="p_t">Wandstärke</label><div class="unit" data-u="cm"><input id="p_t" type="text" inputmode="decimal" enterkeyhint="done" value="${fmtNum(w.t)}"></div></div>
     <div class="row"><label for="p_shift">Verschieben um</label><div class="unit" data-u="cm"><input id="p_shift" type="text" inputmode="decimal" enterkeyhint="done" placeholder="z. B. 20"></div></div>
     <div class="actions"><button class="btn" id="p_sm" aria-label="Wand zur einen Seite verschieben">◀ Seite A</button><button class="btn" id="p_sp" aria-label="Wand zur anderen Seite verschieben">Seite B ▶</button></div>
-    <div class="note">Winkel ${ang}°. Wand ziehen = parallel verschieben. <b>Endpunkt</b> (Kreis) ziehen = Länge und Winkel ändern, rastet bei 90°/45° ein. Angeschlossene Wände passen sich an.</div>
+    <div class="note">Winkel ${ang}°. Wand ziehen = parallel verschieben. <b>Endpunkt</b> (Kreis) ziehen = Länge und Winkel ändern, rastet bei 90°/45° ein. Angeschlossene Wände passen sich an. Freie Fläche ziehen verschiebt die Ansicht, Tippen beendet die Auswahl.</div>
     <div class="actions"><button class="btn del" id="p_del">Wand löschen</button></div>`;
   }
   else if(selection.type==='room'){ const r=roomById(selection.id); if(!r){panel.hidden=true;return;}
@@ -927,7 +936,7 @@ function setTool(t){ settings.tool=t; $('#toolDraw').setAttribute('aria-pressed'
   $('#hintText').innerHTML=t==='draw'?'<b>Zeichnen</b> mit Stift oder Finger – Linien werden automatisch begradigt, eine geschlossene Form wird zum Raum. <b>Tippen</b> wählt aus, dann Maß eingeben. <b>Zwei Finger</b>: verschieben &amp; zoomen.'
    :'<b>Ecken</b> ziehen verändert Räume, <b>Wände</b> ziehen verschiebt sie parallel. Ecken rasten an Nachbarn und anderen Ecken ein.'; save(); draw(); }
 $('#toolDraw').onclick=()=>setTool('draw'); $('#toolEdit').onclick=()=>setTool('edit');
-const sb=$('#settingsBtn'), sp_=$('#settings'); sb.onclick=()=>{$('#exportMenu').hidden=true; sp_.hidden=!sp_.hidden; sb.setAttribute('aria-expanded',!sp_.hidden); if(!sp_.hidden)panel.hidden=true; else buildPanel();};
+const sb=$('#settingsBtn'), sp_=$('#settings'); sb.onclick=()=>{$('#exportMenu').hidden=true; $('#clearMenu').hidden=true; sp_.hidden=!sp_.hidden; sb.setAttribute('aria-expanded',!sp_.hidden); if(!sp_.hidden)panel.hidden=true; else buildPanel();};
 cv.addEventListener('pointerdown',()=>{if(!sp_.hidden){sp_.hidden=true;sb.setAttribute('aria-expanded','false');}},true);
 /* ---------- Bibliothek ---------- */
 const lib=$('#library'), libBtn=$('#libBtn'), libBody=$('#libBody'); let libTab='rooms';
@@ -958,10 +967,13 @@ const wallT=$('#wallT'); wallT.onchange=()=>{const x=num(wallT.value); if(x&&x>0
 const measure=$('#measure'); measure.onchange=()=>{settings.measure=measure.value; save(); draw();};
 const fd=$('#fingerMode'); fd.onchange=()=>{settings.fingerMode=fd.value; if(fd.value==='auto')settings.penSeen=false; save(); toast(fingerDraws()?'Ein Finger zeichnet – zwei Finger verschieben und zoomen':'Finger verschiebt – gezeichnet wird mit dem Stift');};
 $('#undo').onclick=undo; $('#redo').onclick=redo; $('#fit').onclick=fit;
-let clearArm=null; $('#clear').onclick=()=>{ const b=$('#clear').querySelector('b');
-  if(!clearArm){ b.textContent='Wirklich alles löschen? Nochmal tippen'; clearArm=setTimeout(()=>{b.textContent='Neuer Plan';clearArm=null;},3500); return; }
-  clearTimeout(clearArm); clearArm=null; b.textContent='Neuer Plan'; $('#settings').hidden=true;
-  checkpoint(); state={nodes:[],walls:[],rooms:[],items:[]}; selection=null; view.s=.9; view.ox=VW/2; view.oy=VH/2; commitUI(); toast('Leerer Plan – mit Stift oder Finger loszeichnen'); };
+const clearMenu=$('#clearMenu'), clearBtn=$('#clearBtn');
+function showClear(on){ clearMenu.hidden=!on; clearBtn.setAttribute('aria-expanded',on); if(on){ $('#settings').hidden=true; $('#exportMenu').hidden=true; panel.hidden=true; if(typeof openLib==='function'&&!lib.hidden)openLib(false); $('#clearNo').focus(); } else buildPanel(); }
+clearBtn.onclick=()=>showClear(clearMenu.hidden);
+$('#clearNo').onclick=()=>showClear(false);
+$('#clearYes').onclick=()=>{ clearMenu.hidden=true; clearBtn.setAttribute('aria-expanded','false');
+  checkpoint(); state={nodes:[],walls:[],rooms:[],items:[]}; selection=null; view.s=.9; view.ox=VW/2; view.oy=VH/2; commitUI(); toast('Alles gelöscht – „Rückgängig“ holt den Plan zurück'); };
+cv.addEventListener('pointerdown',()=>{ if(!clearMenu.hidden)showClear(false); },true);
 /* ---------- Export ---------- */
 function stamp(){ return new Date().toISOString().slice(0,10); }
 function planName(){ const r=state.rooms[0]; return 'grundriss-'+stamp(); }
@@ -1072,7 +1084,7 @@ function exportDxf(){
   saveFile(new Blob([out.join('\r\n')+'\r\n'],{type:'application/dxf'}),planName()+'.dxf'); }
 const exMenu=$('#exportMenu'), exBtn=$('#export');
 exBtn.onclick=()=>{ if(!bounds()){toast('Der Plan ist noch leer');return;} exMenu.hidden=!exMenu.hidden; exBtn.setAttribute('aria-expanded',!exMenu.hidden);
-  if(!exMenu.hidden){ $('#settings').hidden=true; panel.hidden=true; } else buildPanel(); };
+  if(!exMenu.hidden){ $('#settings').hidden=true; $('#clearMenu').hidden=true; panel.hidden=true; } else buildPanel(); };
 const closeEx=()=>{exMenu.hidden=true; exBtn.setAttribute('aria-expanded','false'); buildPanel();};
 $('#exPng').onclick=()=>{closeEx(); exportPng();}; $('#exPdf').onclick=()=>{closeEx(); exportPdf();}; $('#exDxf').onclick=()=>{closeEx(); exportDxf();};
 cv.addEventListener('pointerdown',()=>{ if(!exMenu.hidden)closeEx(); },true);
@@ -1095,7 +1107,7 @@ new ResizeObserver(()=>resize()).observe(cv);
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>applyTheme());
 new MutationObserver(()=>{readPal();draw();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 document.fonts&&document.fonts.ready.then(()=>draw());
-requestAnimationFrame(()=>{resize(); fit(); if(state.example)toast('Beispielplan – leer starten über Einstellungen → Neuer Plan');});
+requestAnimationFrame(()=>{resize(); fit(); if(state.example)toast('Beispielplan – Papierkorb oben rechts löscht alles');});
 })();
 </script>
 
