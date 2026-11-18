@@ -8,22 +8,23 @@ Einfaches Grundriss-Programm für den Browser, gemacht fürs iPad mit Apple Penc
 - Raumvorlagen: Rechteck, Quadrat, L/T/U-Form, Dreiecke, Trapez, Erker, Sechseck …
 - Türen und Fenster rasten in Wänden ein
 - Standardmöbel aus dem Menü (Wohnen, Schlafen, Küche, Bad, Arbeiten)
-- Rückgängig/Wiederholen, Export als PNG, automatisches Speichern im Browser
+- Bibliothek mit Vorschaubildern für Räume, Türen, Fenster und Möbel
+- Export als Bild (PNG), maßstäbliches PDF (1:50/1:100/1:200) und CAD-Datei (DXF, mm, mit Layern)
+- Rückgängig/Wiederholen, automatisches Speichern im Browser
 
 ## Bedienung
 
 | Eingabe | Aktion |
 |---|---|
-| Stift ziehen | Wand zeichnen |
+| Stift oder Finger ziehen | Wand zeichnen |
 | Tippen | Wand, Raum oder Möbel auswählen |
-| Ein Finger | Plan verschieben |
 | Zwei Finger | Zoomen |
 
-Ohne Stift: Regler-Symbol → „Mit dem Finger zeichnen“.
+Sobald ein Apple Pencil benutzt wird, zeichnet nur noch der Stift und ein Finger verschiebt den Plan. Einstellbar über das Regler-Symbol → „Finger auf dem Display“.
 
 ## Online stellen (GitHub Pages)
 
 Settings → Pages → *Deploy from a branch* → Branch `main`, Ordner `/ (root)` → Save.
 Danach ist die App unter `https://<benutzername>.github.io/room-layout-pro/` erreichbar.
 
-Die App ist eine einzige Datei (`index.html`) ohne Abhängigkeiten oder Build-Schritt.
+Die App besteht aus `index.html` und `jspdf.umd.min.js` (jsPDF 2.5.1, MIT-Lizenz, für den PDF-Export). Kein Build-Schritt nötig.
